@@ -1,16 +1,58 @@
+<div align="center">
+
 # Event Seat Booking
 
-A domain model for a seat reservation system, built to demonstrate Domain-Driven Design done properly: business rules live inside the entities that own them, not scattered across a service layer pretending to be "business logic."
+**A Domain-Driven Design reference implementation — seat reservation modeled as aggregates that enforce their own consistency, not a service layer bolting rules onto anemic data.**
 
-This is a domain layer, not a finished application — deliberately. No API, no database, no infrastructure. The discipline here is getting the model right in isolation first, so nothing downstream has to compensate for a weak domain.
+![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
+![EF Core](https://img.shields.io/badge/EF_Core-9.0-512BD4?style=for-the-badge&logo=nuget&logoColor=white)
+![SQL Server](https://img.shields.io/badge/SQL_Server-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)
+![xUnit](https://img.shields.io/badge/xUnit-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
+
+</div>
 
 ---
 
-## Design
+## Overview
 
-### Aggregates
+Two customers can't book the same seat. A booking can't exceed six seats. A cancelled booking can't be confirmed, but a confirmed one can be cancelled. None of these rules live in a service checking `if` statements before calling a repository — they live inside the entities responsible for them, enforced through methods, not exposed through public setters.
 
-**`Booking`** — the aggregate root for a single customer's reservation attempt. Owns a collection of `BookedSeat` and enforces every rule that governs its own consistency:
+This project demonstrates that discipline end-to-end: two aggregate roots, a domain service coordinating the one rule that spans both, domain events raised only on success, and a thin Application + Infrastructure + API layer proving the model works against a real database, not just in memory.
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    Api["Api<br/>Thin controllers, no business logic"]
+    App["Application<br/>Use cases, IUnitOfWork"]
+    Domain["Domain<br/>Booking, Screening, SeatAvailabilityService"]
+    Infra["Infrastructure<br/>EF Core, repositories, migrations"]
+
+    Api --> App
+    App --> Domain
+    Infra -.implements.-> App
+    Infra -.implements.-> Domain
+
+    style Api fill:#E6F1FB,stroke:#185FA5,color:#0C447C
+    style App fill:#E6F1FB,stroke:#185FA5,color:#0C447C
+    style Domain fill:#E6F1FB,stroke:#185FA5,color:#0C447C
+    style Infra fill:#E1F5EE,stroke:#0F6E56,color:#085041
+```
+
+- **Domain** — zero dependencies on anything else. No EF Core, no HTTP, nothing but C# and the business rules themselves.
+- **Application** — orchestrates use cases: load aggregates, call domain methods, commit once via `IUnitOfWork`.
+- **Infrastructure** — implements the interfaces Domain and Application define. Owns EF Core, SQL Server, and the migrations.
+- **Api** — three endpoints, each a direct call into a use case. If a controller ever needs an `if` statement to enforce a rule, that rule belongs in Domain instead.
+
+---
+
+## Aggregates
+
+### `Booking`
+
+Owns a collection of `BookedSeat`. Enforces:
 
 - Maximum 6 seats per booking
 - No duplicate seat within the same booking
@@ -18,39 +60,85 @@ This is a domain layer, not a finished application — deliberately. No API, no 
 - A booking with zero seats cannot be confirmed
 - A cancelled booking cannot be confirmed; a confirmed booking can still be cancelled
 
-None of these checks live outside the entity. There is no `BookingService.AddSeat()` making the decision on `Booking`'s behalf — the only way to add a seat is through `Booking.AddSeat()`, which means the rule cannot be bypassed by code that forgets to call a validator first.
+Constructed only through `Booking.Create(...)` — a private constructor and private setters mean there is no path to an invalid `Booking`.
 
-**`Screening`** — the aggregate root for a single showing: title, showtime, and the seat map for that showing (`Available` / `Reserved` / `Booked` per seat). It's a separate aggregate from `Booking` on purpose — many bookings reference the same screening, and a screening's lifecycle (created, rescheduled) doesn't need to change atomically with any individual booking. Collapsing them into one aggregate would create a far larger consistency boundary than the actual business rules require.
+### `Screening`
+
+Owns the seat map for a single showing — title, showtime, and each seat's status (`Available` / `Reserved` / `Booked`). Kept as a separate aggregate from `Booking` deliberately: many bookings reference one screening, and a screening's own lifecycle doesn't need to change atomically with any individual booking.
 
 ### The cross-aggregate problem
 
-Neither aggregate can answer "is this seat actually available" on its own. `Booking` has no visibility into other bookings; `Screening` owns availability but has no concept of who's booking. This is resolved with `SeatAvailabilityService` — a Domain Service, used specifically because the rule spans two aggregates and belongs to neither individually.
+Neither aggregate can answer "is this seat actually free" alone — `Booking` only sees its own seats, `Screening` owns availability but not the booking decision. `SeatAvailabilityService`, a Domain Service, resolves this: it asks `Screening` to reserve the seat first, and only adds it to `Booking` if that succeeds. A rejected reservation never touches `Booking`, so the two aggregates never drift out of sync.
 
-The service does no validation itself; it coordinates. It asks `Screening` to reserve the seat first, and only adds the seat to `Booking` if that succeeds. If the seat is already taken, `Screening` rejects the reservation before `Booking` is ever touched — so the two aggregates never drift out of sync. Full reasoning, including the alternatives considered and rejected, is documented in [`docs/domain-model.md`](docs/domain-model.md).
+Full reasoning — including the alternatives considered and why they were rejected — is in [`docs/domain-model.md`](docs/domain-model.md).
 
 ### Domain Events
 
-`SeatAddedEvent`, `BookingConfirmedEvent`, and `BookingCancelledEvent` are raised from inside `Booking`, and only on success — a rejected operation (seat limit exceeded, confirming an empty booking) raises nothing. Modeled as immutable C# records, collected on the aggregate, and cleared via `ClearDomainEvents()` once consumed. Publishing them is an application-layer concern, deliberately out of scope here.
+`SeatAddedEvent`, `BookingConfirmedEvent`, `BookingCancelledEvent` — immutable records, raised from inside `Booking` only on success. A rejected operation (seat limit exceeded, confirming an empty booking) raises nothing. Collected on the aggregate, cleared via `ClearDomainEvents()` once consumed.
 
-### Concurrency
+---
 
-Two customers reserving the same seat simultaneously is a real scenario, addressed at the design level rather than implemented against an in-memory model with no actual concurrent access to protect. The design doc specifies the concrete mechanism — optimistic concurrency via a row version on `Screening`, or a database-level uniqueness constraint on seat reservation — to be applied once persistence exists.
+## API
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/screenings/{screeningId}/reserve-seat` | Coordinates `Screening` + `Booking` via `SeatAvailabilityService`; creates a new booking |
+| POST | `/api/bookings/{bookingId}/confirm` | Confirms a pending booking with at least one seat |
+| POST | `/api/bookings/{bookingId}/cancel` | Cancels a booking and releases its seats back to `Available` on the screening |
+
+**Example:**
+
+```
+POST /api/screenings/1/reserve-seat
+{
+  "customerId": 1,
+  "seatRow": "A",
+  "seatColumnNumber": 1
+}
+```
+
+A second identical request against the same seat returns `400 Bad Request` — proof the invariant holds through the full stack, not just in a unit test.
 
 ---
 
 ## Testing
 
-29 unit tests, all exercising the aggregates directly with no infrastructure and no mocking. Coverage includes:
-
-- Boundary conditions (exactly 6 seats succeeds, a 7th is rejected)
-- Negative cases proving a failed operation raises no domain event
-- The cross-aggregate case: a second reservation attempt on an already-reserved seat is rejected by `Screening` before it ever reaches `Booking`
+29 unit tests against the domain layer directly — no mocking, no infrastructure. Coverage includes boundary conditions (exactly 6 seats succeeds, a 7th is rejected), negative cases (a failed operation raises no domain event), and the cross-aggregate case: a second reservation attempt on an already-reserved seat is rejected by `Screening` before it ever reaches `Booking`.
 
 ---
 
-## What's next
+## Running it locally
 
-- Application layer — use cases orchestrating the domain (`ReserveSeatCommandHandler`, event publishing)
-- Infrastructure — EF Core repositories, one per aggregate root, matching the interfaces already defined
-- API layer
-- Concurrency implementation against real persistence, per the design doc
+```bash
+git clone https://github.com/Ommmarr111/EventSeatBooking.git
+cd EventSeatBooking
+dotnet ef database update --project EventSeatBooking.Infrastructure --startup-project EventSeatBooking.Api
+dotnet run --project EventSeatBooking.Api --launch-profile http
+```
+
+Set `ConnectionStrings:DefaultConnection` in `EventSeatBooking.Api/appsettings.json` to a local SQL Server instance.
+
+Swagger: `http://localhost:5134/swagger`
+
+The database starts empty — seed a `Screening` and its `Seat` rows directly before exercising the API; there's deliberately no admin endpoint for this, since creating screenings isn't part of what this project demonstrates.
+
+---
+
+## Project structure
+
+```
+EventSeatBooking.Domain/          # Entities, Value Objects, Domain Services, Domain Events, repository interfaces
+EventSeatBooking.Domain.Tests/    # 29 unit tests against the domain layer only
+EventSeatBooking.Application/     # Use cases, IUnitOfWork
+EventSeatBooking.Infrastructure/  # EF Core DbContext, entity configurations, repositories, migrations
+EventSeatBooking.Api/             # Controllers, DI wiring
+docs/domain-model.md              # Design rationale: aggregate boundaries, the Domain Service, concurrency approach
+```
+
+---
+
+<div align="center">
+
+**[LinkedIn](https://linkedin.com/in/Ommmarr111) · [GitHub](https://github.com/Ommmarr111)**
+
+</div>
