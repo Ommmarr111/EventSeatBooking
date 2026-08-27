@@ -12,22 +12,30 @@ namespace EventSeatBooking.Domain.Entities
         private readonly List<IDomainEvent> _domainEvents = new();
 
         public int Id { get; private set; }
+
+        public int ScreeningId { get; private set; }
+
         public int CustomerId { get; private set; }
         public BookingStatus Status { get; private set; }
         public IReadOnlyCollection<BookedSeat> Seats => _seats.AsReadOnly();
         public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
-        private Booking(int customerId)
+        private Booking()
+        {
+
+        }
+        private Booking(int customerId, int screeningId)
         {
             CustomerId = customerId;
             Status = BookingStatus.Pending;
+            ScreeningId = screeningId;
         }
 
-        public static Booking Create(int customerId)
+        public static Booking Create(int customerId, int screeningId)
         {
             if (customerId <= 0)
                 throw new DomainException("Invalid customer.");
-            return new Booking(customerId);
+            return new Booking(customerId, screeningId);
         }
 
         public void AddSeat(SeatNumber seatNumber)

@@ -11,7 +11,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_ShouldRaiseSeatAdded()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
 
             // Act
             booking.AddSeat(SeatNumber.Of("A", 1));
@@ -26,7 +26,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_WhenSeatLimitExceeded_ShouldNotRaiseAnAdditionalEvent()
         {
             // Arrange — fill up to the limit (6 events raised)
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             for (int i = 1; i <= 6; i++)
                 booking.AddSeat(SeatNumber.Of("A", i));
 
@@ -41,7 +41,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Confirm_ShouldRaiseBookingConfirmed_WithCorrectSeatCount()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1));
             booking.AddSeat(SeatNumber.Of("A", 2));
 
@@ -58,7 +58,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Confirm_WhenNoSeats_ShouldThrow_AndNotRaiseAnyEvent()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
 
             // Act & Assert
             Assert.Throws<DomainException>(() => booking.Confirm());
@@ -69,7 +69,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Cancel_ShouldRaiseBookingCancelled()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1));
 
             // Act
@@ -85,7 +85,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Cancel_WhenAlreadyCancelled_ShouldThrow_AndNotRaiseASecond()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1));
             booking.Cancel();
 
@@ -98,7 +98,7 @@ namespace EventSeatBooking.Domain.Tests
         public void ClearDomainEvents_ShouldEmptyTheCollection()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1));
             booking.Confirm();
             Assert.NotEmpty(booking.DomainEvents);

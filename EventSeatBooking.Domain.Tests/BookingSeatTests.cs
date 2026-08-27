@@ -11,7 +11,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_ToPendingBooking_ShouldAddSeat()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             var seat = SeatNumber.Of("A", 1);
 
             // Act
@@ -25,7 +25,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_DuplicateSeat_ShouldThrowDomainException()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             var seat = SeatNumber.Of("A", 1);
             booking.AddSeat(seat);
 
@@ -38,7 +38,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_SeventhSeat_ShouldThrowDomainException()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             for (int i = 1; i <= 6; i++)
                 booking.AddSeat(SeatNumber.Of("A", i));
 
@@ -51,7 +51,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_ExactlySixSeats_ShouldSucceed()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
 
             // Act
             for (int i = 1; i <= 6; i++)
@@ -65,7 +65,7 @@ namespace EventSeatBooking.Domain.Tests
         public void AddSeat_ToConfirmedBooking_ShouldThrowDomainException()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1));
             booking.Confirm();
 
@@ -78,7 +78,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Confirm_WithNoSeats_ShouldThrowDomainException()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
 
             // Act & Assert
             var ex = Assert.Throws<DomainException>(() => booking.Confirm());
@@ -89,7 +89,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Confirm_WithAtLeastOneSeat_ShouldSucceed()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1));
 
             // Act

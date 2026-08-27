@@ -6,6 +6,5 @@ namespace EventSeatBooking.Domain.Interfaces
     {
         Task<Screening?> GetByIdAsync(int id);
         Task AddAsync(Screening screening);
-        Task SaveChangesAsync();
     }
 }

@@ -19,7 +19,7 @@ namespace EventSeatBooking.Domain.Tests
         {
             // Arrange
             var screening = MakeScreening();
-            var booking = Booking.Create(customerId: 1);
+            var booking = Booking.Create(customerId: 1, 1);
             var seatNumber = SeatNumber.Of("A", 1);
 
             // Act
@@ -35,8 +35,8 @@ namespace EventSeatBooking.Domain.Tests
         {
             // Arrange — this is the key test: proves the ordering we discussed actually protects consistency
             var screening = MakeScreening();
-            var firstBooking = Booking.Create(customerId: 1);
-            var secondBooking = Booking.Create(customerId: 2);
+            var firstBooking = Booking.Create(customerId: 1, 1);
+            var secondBooking = Booking.Create(customerId: 2, 2);
             var seatNumber = SeatNumber.Of("A", 1);
 
             _service.ReserveSeatForBooking(screening, firstBooking, seatNumber); // first customer succeeds

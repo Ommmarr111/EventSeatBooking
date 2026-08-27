@@ -6,6 +6,5 @@ namespace EventSeatBooking.Domain.Interfaces
     {
         Task<Booking?> GetByIdAsync(int id);
         Task AddAsync(Booking booking);
-        Task SaveChangesAsync();
     }
 }

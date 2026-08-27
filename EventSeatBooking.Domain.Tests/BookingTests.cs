@@ -11,7 +11,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Create_WithValidCustomerId_ShouldCreatePendingBooking()
         {
             // Act
-            var booking = Booking.Create(customerId: 1);
+            var booking = Booking.Create(customerId: 1, 1);
 
             // Assert
             Assert.Equal(1, booking.CustomerId);
@@ -19,12 +19,12 @@ namespace EventSeatBooking.Domain.Tests
         }
 
         [Theory]
-        [InlineData(0)]
-        [InlineData(-1)]
-        public void Create_WithInvalidCustomerId_ShouldThrowDomainException(int invalidId)
+        [InlineData(0, 1)]
+        [InlineData(-1, 1)]
+        public void Create_WithInvalidCustomerId_ShouldThrowDomainException(int invalidId, int screeningId)
         {
             // Act & Assert
-            var ex = Assert.Throws<DomainException>(() => Booking.Create(invalidId));
+            var ex = Assert.Throws<DomainException>(() => Booking.Create(invalidId, screeningId));
             Assert.Equal("Invalid customer.", ex.Message);
         }
 
@@ -32,8 +32,8 @@ namespace EventSeatBooking.Domain.Tests
         public void Confirm_OnPendingBooking_ShouldSetStatusToConfirmed()
         {
             // Arrange
-            var booking = Booking.Create(1);
-            booking.AddSeat(SeatNumber.Of("A", 1)); // ← add this line
+            var booking = Booking.Create(1, 1);
+            booking.AddSeat(SeatNumber.Of("A", 1));
 
             // Act
             booking.Confirm();
@@ -46,7 +46,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Confirm_OnCancelledBooking_ShouldThrowDomainException()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1)); // ← add this line
 
             booking.Cancel();
@@ -60,7 +60,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Cancel_OnPendingBooking_ShouldSetStatusToCancelled()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
 
             // Act
             booking.Cancel();
@@ -73,7 +73,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Cancel_OnConfirmedBooking_ShouldSetStatusToCancelled()
         {
             // Arrange 
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.AddSeat(SeatNumber.Of("A", 1)); // ← add this line
 
             booking.Confirm();
@@ -89,7 +89,7 @@ namespace EventSeatBooking.Domain.Tests
         public void Cancel_OnAlreadyCancelledBooking_ShouldThrowDomainException()
         {
             // Arrange
-            var booking = Booking.Create(1);
+            var booking = Booking.Create(1, 1);
             booking.Cancel();
 
             // Act & Assert

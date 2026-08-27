@@ -12,6 +12,7 @@ namespace EventSeatBooking.Domain.Entities
         public DateTime ShowTime { get; private set; }
         public IReadOnlyCollection<Seat> Seats => _seats.AsReadOnly();
 
+        private Screening() { }
         private Screening(string title, DateTime showTime)
         {
             Title = title;

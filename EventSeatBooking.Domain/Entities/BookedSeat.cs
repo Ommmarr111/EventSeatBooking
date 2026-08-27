@@ -7,6 +7,7 @@ namespace EventSeatBooking.Domain.Entities
         public int Id { get; private set; }
         public SeatNumber SeatNumber { get; private set; }
 
+        private BookedSeat() { }
         private BookedSeat(SeatNumber seatNumber)
         {
             SeatNumber = seatNumber;
